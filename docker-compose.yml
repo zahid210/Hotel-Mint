@@ -1,14 +1,12 @@
 # ════════════════════════════════════════════════════════════════
-# Hotel Bahía — Stack autoservido con Docker Compose
+# Hotel Bahía — Arquitectura desacoplada en 3 contenedores (3 Capas)
 #
 #   docker compose up -d --build
 #
 # Servicios:
-#   db       → MariaDB (puerto 3307 en el host, sin conflicto con el 3306 local)
-#   backend  → Spring Boot: sirve la web y la API /api/v1/* en :8080
-#              (el frontend compilado va embebido en el jar, sin nginx)
-#
-# Ajusta los valores reproducibles en un archivo .env (ver .env.example).
+#   db       → MariaDB 11 (puerto 3307 en el host)
+#   backend  → Spring Boot API pura (puerto 8080)
+#   frontend → Nginx sirviendo la SPA React (puerto 80) + proxy a /api
 # ════════════════════════════════════════════════════════════════
 
 services:
@@ -34,10 +32,8 @@ services:
 
   backend:
     build:
-      context: .
-      dockerfile: backend/Dockerfile
-      args:
-        VITE_API_URL: /api/v1
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: hotel-bahia-backend
     restart: unless-stopped
     depends_on:
@@ -48,21 +44,41 @@ services:
       DATABASE_URL:           jdbc:mariadb://db:3306/${DB_NAME:-hotel_bahia}
       DATABASE_USERNAME:      ${DB_USER:-hotel}
       DATABASE_PASSWORD:      ${DB_PASSWORD:-hotel_bahia}
-      # Obligatorio: sin JWT_SECRET el stack no arranca (no hay default conocido)
       JWT_SECRET:             ${JWT_SECRET:?Define JWT_SECRET en tu .env (ver .env.example)}
       JWT_EXPIRATION_MS:      ${JWT_EXPIRATION_MS:-86400000}
       APP_TIMEZONE:           ${APP_TIMEZONE:-America/Lima}
       APP_ADMIN_EMAIL:        ${APP_ADMIN_EMAIL:-zahidmatos@hotel.com}
       APP_ADMIN_NOMBRE:       ${APP_ADMIN_NOMBRE:-Zahid Matos}
       APP_ADMIN_PASSWORD:     ${APP_ADMIN_PASSWORD:-hotel_bahia}
+      FRONTEND_URL:           ${FRONTEND_URL:-http://localhost,http://localhost:80}
     ports:
       - "8080:8080"
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/api/v1/server/time"]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 30s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api/v1
+    container_name: hotel-bahia-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:80/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
 
 volumes:
   dbdata:

@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.*;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Configuration
@@ -17,13 +18,23 @@ public class CorsConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
-        // Orígenes EXACTOS (no wildcards): en dev el navegador habla con
-        // Vite (5173) y en el clúster con el mismo origen del backend.
-        config.setAllowedOrigins(List.of(
+        List<String> origins = new ArrayList<>(List.of(
+                "http://localhost",
+                "http://localhost:80",
                 "http://localhost:5173",
-                "http://127.0.0.1:5173",
-                frontendUrl.trim()
+                "http://127.0.0.1",
+                "http://127.0.0.1:80",
+                "http://127.0.0.1:5173"
         ));
+        if (frontendUrl != null && !frontendUrl.isBlank()) {
+            for (String u : frontendUrl.split(",")) {
+                String trimmed = u.trim();
+                if (!trimmed.isEmpty() && !origins.contains(trimmed)) {
+                    origins.add(trimmed);
+                }
+            }
+        }
+        config.setAllowedOrigins(origins);
 
         config.setAllowedMethods(List.of(
                 "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"

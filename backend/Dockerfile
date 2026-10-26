@@ -1,34 +1,19 @@
 # ════════════════════════════════════════════════════════════════
-# Hotel Bahía — Imagen única backend: compila el frontend con Node y
-# lo sirve Spring Boot desde src/main/resources/static.
-# Resultado: una sola imagen sirve la web + la API en :8080 (sin nginx).
+# Hotel Bahía — Backend API (Spring Boot)
 # ════════════════════════════════════════════════════════════════
 
-# ── Etapa 1: Build frontend (React) ────────────────────────────
-FROM node:22-alpine AS frontend-build
-WORKDIR /frontend
-
-COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci
-
-COPY frontend ./
-ARG VITE_API_URL=/api/v1
-ENV VITE_API_URL=$VITE_API_URL
-RUN npm run build
-
-# ── Etapa 2: Build backend (Spring Boot) ───────────────────────
+# ── Etapa 1: Build backend (Spring Boot) ───────────────────────
 FROM eclipse-temurin:21-jdk-alpine AS builder
 WORKDIR /app
 
-COPY backend/.mvn/ .mvn/
-COPY backend/mvnw backend/pom.xml ./
+COPY .mvn/ .mvn/
+COPY mvnw pom.xml ./
 RUN ./mvnw dependency:go-offline -q
 
-COPY backend/src ./src
-COPY --from=frontend-build /frontend/dist ./src/main/resources/static
+COPY src ./src
 RUN ./mvnw package -DskipTests -q
 
-# ── Etapa 3: Runtime ───────────────────────────────────────────
+# ── Etapa 2: Runtime ───────────────────────────────────────────
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
