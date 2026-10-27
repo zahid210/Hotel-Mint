@@ -13,7 +13,6 @@ export interface HabitacionConReserva extends Habitacion {
 const RESERVA_A_HAB: Partial<Record<string, Habitacion['estado']>> = {
     CHECKIN:   'OCUPADA',
     CHECKOUT:  'LIMPIEZA',
-    CANCELADA: 'LIBRE',
 }
 
 export function useDashboard(refreshSignal = 0) {
@@ -64,10 +63,19 @@ export function useDashboard(refreshSignal = 0) {
     // ── Cruce habitación ↔ reserva activa ─────────────────────
     const habitacionesConReserva = useMemo<HabitacionConReserva[]>(() =>
             habitaciones.map(hab => {
-                const reservaActiva = reservas.find(r =>
+                const deEstaHab = reservas.filter(r =>
                     r.habitacionId === hab.id &&
                     (r.estado === 'CHECKIN' || r.estado === 'CONFIRMADA')
-                ) ?? null
+                )
+
+                // P1-04: Prioridad 1: Si hay alguna reserva actualmente en CHECKIN, esa es la estancia en curso.
+                // Prioridad 2: Si no hay CHECKIN, buscar la CONFIRMADA con fecha de entrada más próxima.
+                const enCheckIn = deEstaHab.find(r => r.estado === 'CHECKIN')
+                const siguienteConfirmada = deEstaHab
+                    .filter(r => r.estado === 'CONFIRMADA')
+                    .sort((a, b) => a.fechaEntrada.localeCompare(b.fechaEntrada))[0]
+
+                const reservaActiva = enCheckIn ?? siguienteConfirmada ?? null
 
                 // Excedida = en hotel + fecha de salida ya pasó (comparación de strings ISO)
                 // Usa HOY del servidor para evitar errores si la PC tiene hora incorrecta
@@ -111,21 +119,35 @@ export function useDashboard(refreshSignal = 0) {
             setReservas(prev =>
                 prev.map(r => r.id === reservaId ? actualizada : r)
             )
-            const nuevoEstado = RESERVA_A_HAB[actualizada.estado]
-            if (nuevoEstado) {
+
+            // P2-07: Usar el estado real de la habitación devuelto por el backend
+            if (actualizada.habitacionEstado) {
                 setHabitaciones(prev =>
                     prev.map(h =>
                         h.id === actualizada.habitacionId
-                            ? { ...h, estado: nuevoEstado }
+                            ? { ...h, estado: actualizada.habitacionEstado! }
                             : h
                     )
                 )
+            } else {
+                const nuevoEstado = RESERVA_A_HAB[actualizada.estado]
+                if (nuevoEstado) {
+                    setHabitaciones(prev =>
+                        prev.map(h =>
+                            h.id === actualizada.habitacionId
+                                ? { ...h, estado: nuevoEstado }
+                                : h
+                        )
+                    )
+                }
             }
+            // Sincronizar fuente de verdad
+            void cargar()
             return actualizada
         } finally {
             setProcesando(null)
         }
-    }, [])
+    }, [cargar])
 
     // ── Acciones de reserva ───────────────────────────────────
     const checkIn  = useCallback(

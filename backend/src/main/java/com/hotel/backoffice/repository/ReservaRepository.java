@@ -23,6 +23,12 @@ public interface ReservaRepository extends JpaRepository<Reserva, UUID> {
     @EntityGraph(attributePaths = {"habitacion", "huesped"})
     Optional<Reserva> findByIdAndEstado(UUID id, EstadoReserva estado);
 
+    boolean existsByHabitacionIdAndEstado(Integer habitacionId, EstadoReserva estado);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT r FROM Reserva r WHERE r.id = :id")
+    Optional<Reserva> findWithLockById(@Param("id") UUID id);
+
     // --- Antes de crear una reserva: evitar solapamiento de fechas ---
     @Query("""
         SELECT r FROM Reserva r
@@ -66,7 +72,7 @@ public interface ReservaRepository extends JpaRepository<Reserva, UUID> {
         SELECT COUNT(r) FROM Reserva r
         WHERE r.estado IN ('CHECKIN', 'CONFIRMADA')
           AND r.fechaEntrada <= :fin
-          AND r.fechaSalida  >= :inicio
+          AND r.fechaSalida  > :inicio
     """)
     long countActivasEnPeriodo(
             @Param("inicio") LocalDate inicio,
@@ -78,7 +84,7 @@ public interface ReservaRepository extends JpaRepository<Reserva, UUID> {
         SELECT COUNT(r) FROM Reserva r
         WHERE r.estado = 'CANCELADA'
           AND r.fechaEntrada <= :fin
-          AND r.fechaSalida  >= :inicio
+          AND r.fechaSalida  > :inicio
     """)
     long countCanceladasEnPeriodo(
             @Param("inicio") LocalDate inicio,

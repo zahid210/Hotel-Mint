@@ -63,6 +63,19 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse("SOLICITUD_INVALIDA", ex.getMessage()));
     }
 
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalState(IllegalStateException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse("ESTADO_INVALIDO", ex.getMessage()));
+    }
+
+    @ExceptionHandler(org.springframework.dao.OptimisticLockingFailureException.class)
+    public ResponseEntity<ErrorResponse> handleOptimisticLock(org.springframework.dao.OptimisticLockingFailureException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse("CONFLICTO_CONCURRENCIA",
+                        "El registro fue modificado simultáneamente por otra operación. Por favor, reintente."));
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleConflictoDatos(DataIntegrityViolationException ex) {
         log.warn("Conflicto de datos: {}", ex.getMostSpecificCause().getMessage());

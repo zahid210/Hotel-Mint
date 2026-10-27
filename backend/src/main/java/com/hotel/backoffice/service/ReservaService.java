@@ -30,6 +30,7 @@ public class ReservaService {
     private final HabitacionRepository habitacionRepo;
     private final HuespedRepository    huespedRepo;
     private final UsuarioRepository    usuarioRepo;
+    private final PedidoRepository     pedidoRepo;
 
     @Transactional(readOnly = true)
     public List<ReservaResponseDTO> listarTodas() {
@@ -202,6 +203,13 @@ public class ReservaService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Reserva no encontrada o no está en CHECKIN"
                 ));
+
+        // P1-05: Validar que no existan pedidos PENDIENTE antes de cerrar la cuenta
+        if (pedidoRepo.existsByReservaIdAndEstado(id, Pedido.EstadoPedido.PENDIENTE)) {
+            throw new IllegalStateException(
+                    "No se puede realizar el check-out: existen pedidos pendientes asociados a la habitación. Entréguelos o cancélelos antes de proceder."
+            );
+        }
 
         LocalDateTime ahora = LocalDateTime.now();
 

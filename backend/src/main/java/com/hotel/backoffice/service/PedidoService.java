@@ -81,7 +81,6 @@ public class PedidoService {
             throw new IllegalArgumentException("Selecciona al menos un plato del menú.");
         }
 
-        List<Pedido>     duplicado  = List.of();
         Pedido           nuevo      = Pedido.builder()
                 .reserva(reserva)
                 .habitacion(reserva.getHabitacion())
@@ -140,7 +139,8 @@ public class PedidoService {
             throw new IllegalArgumentException("Un pedido cancelado no se puede modificar.");
         }
 
-        Reserva reserva = pedido.getReserva();
+        Reserva reserva = reservaRepo.findWithLockById(pedido.getReserva().getId())
+                .orElse(pedido.getReserva());
 
         // Solo se cobra al consumo a un huésped que sigue en el hotel.
         if (nuevo == EstadoPedido.ENTREGADO

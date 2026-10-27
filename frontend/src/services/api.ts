@@ -43,7 +43,8 @@ api.interceptors.response.use(
             return Promise.reject(new SesionExpiradaError())
         }
 
-        const mensaje = error.response?.data?.mensaje ?? 'Error de conexión'
+        const data = error.response?.data
+        const mensaje = (typeof data === 'string' ? data : (data?.mensaje ?? data?.message ?? data?.detail)) ?? 'Error de conexión'
         return Promise.reject(new Error(mensaje))
     }
 )

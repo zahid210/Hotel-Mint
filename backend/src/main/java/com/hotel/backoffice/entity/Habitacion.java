@@ -14,6 +14,9 @@ public class Habitacion {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
+    @Version
+    private Long version;
+
     @Column(nullable = false, unique = true, length = 10)
     private String numero;
 

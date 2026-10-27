@@ -5,6 +5,7 @@ export interface Reserva {
     id:               string
     habitacionId:     number
     habitacionNumero: string
+    habitacionEstado?: 'LIBRE' | 'OCUPADA' | 'MANTENIMIENTO' | 'LIMPIEZA'
     tipoHabitacion:   string
     precioNoche:      number
     nombreHuesped:    string

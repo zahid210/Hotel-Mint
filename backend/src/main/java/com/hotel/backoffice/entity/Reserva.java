@@ -19,6 +19,9 @@ public class Reserva {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    @Version
+    private Long version;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "habitacion_id", nullable = false)
     private Habitacion habitacion;

@@ -29,6 +29,8 @@ public class ReporteService {
 
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
+    public record NochesEIngreso(long nochesEnPeriodo, BigDecimal ingresoEnPeriodo) {}
+
     // ── Reporte completo por rango de fechas ──────────────────
     public ReporteCompleto generarReporte(LocalDate inicio, LocalDate fin) {
         if (inicio.isAfter(fin)) {
@@ -41,9 +43,14 @@ public class ReporteService {
         int           totalHabs    = (int) habitacionRepo.count();
         int           diasPeriodo  = (int) ChronoUnit.DAYS.between(inicio, fin) + 1;
 
-        // Solo checkouts para cálculo de ingresos reales (ya cobrados)
-        List<Reserva> facturadas = enPeriodo.stream()
-                .filter(r -> r.getEstado().equals(EstadoReserva.CHECKOUT))
+        // Filtrar reservas que realmente tienen al menos 1 noche en el período
+        List<Reserva> activasConNoches = enPeriodo.stream()
+                .filter(r -> calcularNochesEIngreso(r, inicio, fin).nochesEnPeriodo() > 0)
+                .toList();
+
+        // Checkouts cobrados que tuvieron noches en el período
+        List<Reserva> facturadas = activasConNoches.stream()
+                .filter(r -> r.getEstado() == EstadoReserva.CHECKOUT)
                 .toList();
 
         // Capacidad por tipo de habitación (para ocupación por tipo)
@@ -59,10 +66,10 @@ public class ReporteService {
                 calcularResumen(
                         reservaRepo.countActivasEnPeriodo(inicio, fin),
                         reservaRepo.countCanceladasEnPeriodo(inicio, fin),
-                        facturadas, enPeriodo, totalHabs, inicio, fin, diasPeriodo),
-                calcularOcupacionPorDia(enPeriodo, totalHabs, inicio, fin),
-                calcularRendimientoPorTipo(facturadas, enPeriodo, habsPorTipo, diasPeriodo, inicio, fin),
-                calcularTopHabitaciones(facturadas),
+                        facturadas, activasConNoches, totalHabs, inicio, fin, diasPeriodo),
+                calcularOcupacionPorDia(activasConNoches, totalHabs, inicio, fin),
+                calcularRendimientoPorTipo(facturadas, activasConNoches, habsPorTipo, diasPeriodo, inicio, fin),
+                calcularTopHabitaciones(facturadas, inicio, fin),
                 totalHabs
         );
     }
@@ -78,53 +85,37 @@ public class ReporteService {
             LocalDate fin,
             int diasPeriodo) {
 
-        BigDecimal ingresoTotal = facturadas.stream()
-                .map(Reserva::calcularTotalEstancia)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        long nochesVendidas = 0;
+        BigDecimal ingresoHabitaciones = BigDecimal.ZERO;
 
-        // Noches facturables + noches extra por late checkout (el cargo
-        // de horas extra ya está dentro de ingresoTotal, así el promedio
-        // por noche no queda inflado).
-        long nochesVendidas = facturadas.stream()
-                .mapToLong(r -> r.calcularNochesFacturables() + horasExtraDe(r))
-                .sum();
+        for (Reserva r : facturadas) {
+            NochesEIngreso ni = calcularNochesEIngreso(r, inicio, fin);
+            nochesVendidas += ni.nochesEnPeriodo();
+            ingresoHabitaciones = ingresoHabitaciones.add(ni.ingresoEnPeriodo());
+        }
+
+        // Consumo de servicio de habitación servido (ENTREGADO) en el período
+        BigDecimal ingresoConsumo = pedidoRepo.sumarConsumoEntre(
+                inicio.atStartOfDay(),
+                fin.plusDays(1).atStartOfDay()
+        );
+        if (ingresoConsumo == null) ingresoConsumo = BigDecimal.ZERO;
+
+        BigDecimal ingresoTotal = ingresoHabitaciones.add(ingresoConsumo);
 
         BigDecimal ingresoPorNoche = nochesVendidas > 0
-                ? ingresoTotal.divide(
-                        BigDecimal.valueOf(nochesVendidas), 2, RoundingMode.HALF_UP)
+                ? ingresoTotal.divide(BigDecimal.valueOf(nochesVendidas), 2, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO;
 
-        // CHECKIN = ocupada ahora / CHECKOUT = estuvo ocupada en el período
-        List<Reserva> ocupacionReal = enPeriodo.stream()
-                .filter(r -> r.getEstado() == EstadoReserva.CHECKIN
-                        || r.getEstado() == EstadoReserva.CHECKOUT)
-                .toList();
-
-        long ocupacionesTotales = ocupacionReal.stream()
-                .mapToLong(r -> {
-                    LocalDate desde = r.getFechaEntrada().isBefore(inicio)
-                            ? inicio
-                            : r.getFechaEntrada();
-
-                    LocalDate hasta = r.getFechaSalida().isAfter(fin)
-                            ? fin.plusDays(1)
-                            : r.getFechaSalida();
-
-                    return Math.max(ChronoUnit.DAYS.between(desde, hasta), 0);
-                })
+        // Ocupación real: noches efectivas de CHECKIN y CHECKOUT dentro del período
+        long ocupacionesTotales = enPeriodo.stream()
+                .filter(r -> r.getEstado() == EstadoReserva.CHECKIN || r.getEstado() == EstadoReserva.CHECKOUT)
+                .mapToLong(r -> calcularNochesEIngreso(r, inicio, fin).nochesEnPeriodo())
                 .sum();
 
         double ocupacionPromedio = totalHabs > 0 && diasPeriodo > 0
                 ? (double) ocupacionesTotales / (totalHabs * diasPeriodo) * 100
                 : 0;
-
-        // Consumo de servicio de habitación servido (ENTREGADO),
-        // contado por la fecha en que la reserva llegó a CHECKOUT,
-        // consistente con ingresoTotal (que ya lo incluye vía totalEstancia).
-        BigDecimal ingresoConsumo = pedidoRepo.sumarConsumoEntre(
-                inicio.atStartOfDay(),
-                fin.plusDays(1).atStartOfDay()
-        );
 
         return new ResumenPeriodo(
                 enPeriodo.size(),
@@ -146,27 +137,25 @@ public class ReporteService {
             LocalDate inicio,
             LocalDate fin) {
 
-        // CHECKIN = ocupada ahora / CHECKOUT = estuvo ocupada en el período
         List<Reserva> ocupacionReal = enPeriodo.stream()
-                .filter(r -> r.getEstado() == EstadoReserva.CHECKIN
-                        || r.getEstado() == EstadoReserva.CHECKOUT)
+                .filter(r -> r.getEstado() == EstadoReserva.CHECKIN || r.getEstado() == EstadoReserva.CHECKOUT)
                 .toList();
 
-        int       dias          = (int) ChronoUnit.DAYS.between(inicio, fin) + 1;
-        LocalDate finExclusivo  = fin.plusDays(1);
+        int dias = (int) ChronoUnit.DAYS.between(inicio, fin) + 1;
+        LocalDate finExclusivo = fin.plusDays(1);
 
-        // Arreglo de diferencias: por cada reserva sumamos los días que ocupa
         long[]       ocupadas = new long[dias];
         BigDecimal[] ingreso  = new BigDecimal[dias];
         Arrays.fill(ingreso, BigDecimal.ZERO);
 
         for (Reserva r : ocupacionReal) {
-            LocalDate desde = r.getFechaEntrada().isBefore(inicio)
-                    ? inicio : r.getFechaEntrada();
-            LocalDate hasta = r.getFechaSalida().isAfter(fin)
-                    ? finExclusivo : r.getFechaSalida();
+            LocalDate entrada = r.getFechaEntrada();
+            LocalDate salida = resolverSalidaEfectiva(r);
 
-            if (hasta.isBefore(inicio) || desde.isAfter(fin)) continue;
+            LocalDate desde = entrada.isBefore(inicio) ? inicio : entrada;
+            LocalDate hasta = salida.isAfter(finExclusivo) ? finExclusivo : salida;
+
+            if (!hasta.isAfter(desde)) continue;
 
             int desdeIdx = (int) ChronoUnit.DAYS.between(inicio, desde);
             int hastaIdx = (int) ChronoUnit.DAYS.between(inicio, hasta);
@@ -176,14 +165,14 @@ public class ReporteService {
                 ocupadas[hastaIdx]--;
             }
 
-            // Ingreso diario SOLO de estancias ya cobradas (CHECKOUT),
-            // para que el total de la gráfica coincida con el resumen.
             if (r.getEstado() == EstadoReserva.CHECKOUT) {
-                long noches = r.calcularNochesFacturables() + horasExtraDe(r);
-                BigDecimal valorNoche = noches > 0
-                        ? r.calcularTotalEstancia()
-                        .divide(BigDecimal.valueOf(noches), 4, RoundingMode.HALF_UP)
+                long nochesTotales = Math.max(1, ChronoUnit.DAYS.between(entrada, salida));
+                BigDecimal precioNoche = (r.getHabitacion() != null && r.getHabitacion().getPrecioNoche() != null)
+                        ? r.getHabitacion().getPrecioNoche()
                         : BigDecimal.ZERO;
+                BigDecimal totalHabitacionYExtra = precioNoche.multiply(BigDecimal.valueOf(r.calcularNochesFacturables()))
+                        .add(r.getCargoHorasExtra() != null ? r.getCargoHorasExtra() : BigDecimal.ZERO);
+                BigDecimal valorNoche = totalHabitacionYExtra.divide(BigDecimal.valueOf(nochesTotales), 4, RoundingMode.HALF_UP);
 
                 ingreso[desdeIdx] = ingreso[desdeIdx].add(valorNoche);
                 if (hastaIdx < dias) {
@@ -201,7 +190,7 @@ public class ReporteService {
             acumIngreso   = acumIngreso.add(ingreso[i]);
 
             LocalDate dia = inicio.plusDays(i);
-            double    pct = totalHabs > 0
+            double pct = totalHabs > 0
                     ? Math.min((double) acumOcupadas / totalHabs * 100, 100)
                     : 0;
 
@@ -226,18 +215,12 @@ public class ReporteService {
             LocalDate inicio,
             LocalDate fin) {
 
-        // Noches de ocupación real por tipo (CHECKIN + CHECKOUT), acotadas al período
         Map<String, Long> nochesOcupPorTipo = new HashMap<>();
         for (Reserva r : enPeriodo) {
-            if (r.getEstado() != EstadoReserva.CHECKIN
-                    && r.getEstado() != EstadoReserva.CHECKOUT) {
+            if (r.getEstado() != EstadoReserva.CHECKIN && r.getEstado() != EstadoReserva.CHECKOUT) {
                 continue;
             }
-            LocalDate desde = r.getFechaEntrada().isBefore(inicio)
-                    ? inicio : r.getFechaEntrada();
-            LocalDate hasta = r.getFechaSalida().isAfter(fin)
-                    ? fin.plusDays(1) : r.getFechaSalida();
-            long noches = Math.max(ChronoUnit.DAYS.between(desde, hasta), 0);
+            long noches = calcularNochesEIngreso(r, inicio, fin).nochesEnPeriodo();
             if (noches == 0) continue;
 
             String tipo = r.getHabitacion().getTipo().name();
@@ -245,24 +228,22 @@ public class ReporteService {
         }
 
         Map<String, List<Reserva>> porTipo = facturadas.stream()
-                .collect(Collectors.groupingBy(
-                        r -> r.getHabitacion().getTipo().name()
-                ));
+                .collect(Collectors.groupingBy(r -> r.getHabitacion().getTipo().name()));
 
         return porTipo.entrySet().stream()
                 .map(e -> {
                     String tipo = e.getKey();
                     List<Reserva> lista = e.getValue();
 
-                    long noches = lista.stream()
-                            .mapToLong(r -> r.calcularNochesFacturables() + horasExtraDe(r))
-                            .sum();
+                    long noches = 0;
+                    BigDecimal ingreso = BigDecimal.ZERO;
+                    for (Reserva r : lista) {
+                        NochesEIngreso ni = calcularNochesEIngreso(r, inicio, fin);
+                        noches += ni.nochesEnPeriodo();
+                        ingreso = ingreso.add(ni.ingresoEnPeriodo());
+                    }
 
-                    BigDecimal ingreso = lista.stream()
-                            .map(Reserva::calcularTotalEstancia)
-                            .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-                    long capacidad      = habsPorTipo.getOrDefault(tipo, 0L);
+                    long capacidad = habsPorTipo.getOrDefault(tipo, 0L);
                     double ocupacionPct = capacidad > 0 && diasPeriodo > 0
                             ? Math.min(100.0,
                             (double) nochesOcupPorTipo.getOrDefault(tipo, 0L)
@@ -283,24 +264,24 @@ public class ReporteService {
 
     // ── Top habitaciones más rentables ────────────────────────
     private List<HabitacionTop> calcularTopHabitaciones(
-            List<Reserva> facturadas) {
+            List<Reserva> facturadas,
+            LocalDate inicio,
+            LocalDate fin) {
 
         Map<String, List<Reserva>> porHab = facturadas.stream()
-                .collect(Collectors.groupingBy(
-                        r -> r.getHabitacion().getNumero()
-                ));
+                .collect(Collectors.groupingBy(r -> r.getHabitacion().getNumero()));
 
         return porHab.values().stream()
                 .map(lista -> {
                     Reserva primera = lista.getFirst();
 
-                    long noches = lista.stream()
-                            .mapToLong(r -> r.calcularNochesFacturables() + horasExtraDe(r))
-                            .sum();
-
-                    BigDecimal ingreso = lista.stream()
-                            .map(Reserva::calcularTotalEstancia)
-                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                    long noches = 0;
+                    BigDecimal ingreso = BigDecimal.ZERO;
+                    for (Reserva r : lista) {
+                        NochesEIngreso ni = calcularNochesEIngreso(r, inicio, fin);
+                        noches += ni.nochesEnPeriodo();
+                        ingreso = ingreso.add(ni.ingresoEnPeriodo());
+                    }
 
                     return new HabitacionTop(
                             primera.getHabitacion().getNumero(),
@@ -315,9 +296,54 @@ public class ReporteService {
                 .toList();
     }
 
-    // ── Utilidades ────────────────────────────────────────────
-    private int horasExtraDe(Reserva r) {
-        Integer h = r.getHorasExtra();
-        return h == null ? 0 : h;
+    // ── Helper centralizado de noches e ingresos prorrateados ─
+    public NochesEIngreso calcularNochesEIngreso(Reserva r, LocalDate inicio, LocalDate fin) {
+        LocalDate entrada = r.getFechaEntrada();
+        LocalDate salida = resolverSalidaEfectiva(r);
+
+        // Noches totales de la estancia
+        long nochesTotales = Math.max(1, ChronoUnit.DAYS.between(entrada, salida));
+
+        // Rango del período semiabierto: [inicio, finExclusivo)
+        LocalDate finExclusivo = fin.plusDays(1);
+        LocalDate desde = entrada.isBefore(inicio) ? inicio : entrada;
+        LocalDate hasta = salida.isAfter(finExclusivo) ? finExclusivo : salida;
+
+        long nochesEnPeriodo = Math.max(0, ChronoUnit.DAYS.between(desde, hasta));
+        if (nochesEnPeriodo == 0) {
+            return new NochesEIngreso(0, BigDecimal.ZERO);
+        }
+
+        if (r.getEstado() != EstadoReserva.CHECKOUT) {
+            return new NochesEIngreso(nochesEnPeriodo, BigDecimal.ZERO);
+        }
+
+        BigDecimal precioNoche = (r.getHabitacion() != null && r.getHabitacion().getPrecioNoche() != null)
+                ? r.getHabitacion().getPrecioNoche()
+                : BigDecimal.ZERO;
+
+        BigDecimal totalHabitacionYExtra = precioNoche.multiply(BigDecimal.valueOf(r.calcularNochesFacturables()))
+                .add(r.getCargoHorasExtra() != null ? r.getCargoHorasExtra() : BigDecimal.ZERO);
+
+        BigDecimal valorPorNoche = totalHabitacionYExtra.divide(BigDecimal.valueOf(nochesTotales), 4, RoundingMode.HALF_UP);
+        BigDecimal ingresoHabitacion = valorPorNoche.multiply(BigDecimal.valueOf(nochesEnPeriodo))
+                .setScale(2, RoundingMode.HALF_UP);
+
+        return new NochesEIngreso(nochesEnPeriodo, ingresoHabitacion);
+    }
+
+    private LocalDate resolverSalidaEfectiva(Reserva r) {
+        LocalDate salida = r.getFechaSalida();
+        if (r.getEstado() == EstadoReserva.CHECKOUT) {
+            if (r.getHorasExtra() != null && r.getHorasExtra() > 0) {
+                salida = salida.plusDays(r.getHorasExtra());
+            } else if (r.getCheckoutReal() != null && r.getCheckoutReal().toLocalDate().isAfter(salida)) {
+                salida = r.getCheckoutReal().toLocalDate();
+            }
+        }
+        if (!salida.isAfter(r.getFechaEntrada())) {
+            salida = r.getFechaEntrada().plusDays(1);
+        }
+        return salida;
     }
 }

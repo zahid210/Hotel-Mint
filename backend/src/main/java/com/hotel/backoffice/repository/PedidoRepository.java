@@ -30,6 +30,8 @@ public interface PedidoRepository extends JpaRepository<Pedido, UUID> {
             attributePaths = {"reserva", "habitacion", "usuario", "items", "items.menuItem"})
     List<Pedido> findByReservaIdOrderByCreatedAtDesc(UUID reservaId);
 
+    boolean existsByReservaIdAndEstado(UUID reservaId, EstadoPedido estado);
+
     // ── Reportes: consumo servido (ENTREGADO) contado por fecha de checkout ──
     // Consistente con los ingresos de habitación, que también se atribuyen
     // al día en que la reserva llegó a CHECKOUT.
