@@ -42,6 +42,7 @@ public class DataInitializer implements CommandLineRunner {
     @Value("${app.admin.email:zahidmatos@hotel.com}")   private String adminEmail;
     @Value("${app.admin.nombre:Zahid Matos}")           private String adminNombre;
     @Value("${app.admin.password:}")                    private String adminPassword;
+    @Value("${app.seed-demo:false}")                    private boolean seedDemo;
 
     @Override
     public void run(String... args) {
@@ -49,7 +50,12 @@ public class DataInitializer implements CommandLineRunner {
         seedMenu();
 
         List<Usuario> usuarios = seedUsuarios();
-        seedDemoOperacion(usuarios);
+        if (seedDemo) {
+            log.info("Sembrando datos ficticios de demostración (reservas, huéspedes, pedidos)...");
+            seedDemoOperacion(usuarios);
+        } else {
+            log.info("app.seed-demo=false: No se sembraron datos ficticios de reservas ni pedidos.");
+        }
     }
 
     // ── Habitaciones (50, piso 1-5) ────────────────────────────
@@ -158,23 +164,27 @@ public class DataInitializer implements CommandLineRunner {
                     .rol(Rol.ADMIN)
                     .activo(true)
                     .build());
+            log.info("Usuario administrador inicial creado: {}", adminEmail);
         }
 
-        usuarioRepo.save(Usuario.builder()
-                .nombre("María Quispe")
-                .email("recep@hotel.com")
-                .password(encoder.encode("recep123"))
-                .rol(Rol.RECEPCIONISTA)
-                .activo(true)
-                .build());
+        if (seedDemo) {
+            log.warn("app.seed-demo=true: Creando usuarios demo (recepción/limpieza) con credenciales por defecto.");
+            usuarioRepo.save(Usuario.builder()
+                    .nombre("María Quispe")
+                    .email("recep@hotel.com")
+                    .password(encoder.encode("recep123"))
+                    .rol(Rol.RECEPCIONISTA)
+                    .activo(true)
+                    .build());
 
-        usuarioRepo.save(Usuario.builder()
-                .nombre("Juan Huamán")
-                .email("limp@hotel.com")
-                .password(encoder.encode("limp123"))
-                .rol(Rol.LIMPIEZA)
-                .activo(true)
-                .build());
+            usuarioRepo.save(Usuario.builder()
+                    .nombre("Juan Huamán")
+                    .email("limp@hotel.com")
+                    .password(encoder.encode("limp123"))
+                    .rol(Rol.LIMPIEZA)
+                    .activo(true)
+                    .build());
+        }
 
         return usuarioRepo.findAll();
     }

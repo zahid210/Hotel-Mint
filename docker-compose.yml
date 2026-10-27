@@ -4,9 +4,9 @@
 #   docker compose up -d --build
 #
 # Servicios:
-#   db       → MariaDB 11 (puerto 3307 en el host)
-#   backend  → Spring Boot API pura (puerto 8080)
-#   frontend → Nginx sirviendo la SPA React (puerto 80) + proxy a /api
+#   db       → MariaDB 11 (puerto interno 3306, no publicado al host)
+#   backend  → Spring Boot API pura (puerto interno 8080, no publicado al host)
+#   frontend → Nginx sirviendo SPA React (puertos 80/443) + proxy a /api
 # ════════════════════════════════════════════════════════════════
 
 services:
@@ -14,13 +14,13 @@ services:
     image: mariadb:11
     container_name: hotel-bahia-db
     restart: unless-stopped
-    ports:
-      - "3307:3306"
+    expose:
+      - "3306"
     environment:
       MYSQL_DATABASE:      ${DB_NAME:-hotel_bahia}
       MYSQL_USER:          ${DB_USER:-hotel}
-      MYSQL_PASSWORD:      ${DB_PASSWORD:-hotel_bahia}
-      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_local}
+      MYSQL_PASSWORD:      "${DB_PASSWORD:?DB_PASSWORD es obligatorio}"
+      MYSQL_ROOT_PASSWORD: "${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD es obligatorio}"
     volumes:
       - dbdata:/var/lib/mysql
     healthcheck:
@@ -43,16 +43,17 @@ services:
       SPRING_PROFILES_ACTIVE: docker
       DATABASE_URL:           jdbc:mariadb://db:3306/${DB_NAME:-hotel_bahia}
       DATABASE_USERNAME:      ${DB_USER:-hotel}
-      DATABASE_PASSWORD:      ${DB_PASSWORD:-hotel_bahia}
-      JWT_SECRET:             ${JWT_SECRET:?Define JWT_SECRET en tu .env (ver .env.example)}
+      DATABASE_PASSWORD:      "${DB_PASSWORD:?DB_PASSWORD es obligatorio}"
+      JWT_SECRET:             "${JWT_SECRET:?JWT_SECRET es obligatorio}"
       JWT_EXPIRATION_MS:      ${JWT_EXPIRATION_MS:-86400000}
       APP_TIMEZONE:           ${APP_TIMEZONE:-America/Lima}
       APP_ADMIN_EMAIL:        ${APP_ADMIN_EMAIL:-zahidmatos@hotel.com}
       APP_ADMIN_NOMBRE:       ${APP_ADMIN_NOMBRE:-Zahid Matos}
-      APP_ADMIN_PASSWORD:     ${APP_ADMIN_PASSWORD:-hotel_bahia}
-      FRONTEND_URL:           ${FRONTEND_URL:-http://localhost,http://localhost:80}
-    ports:
-      - "8080:8080"
+      APP_ADMIN_PASSWORD:     "${APP_ADMIN_PASSWORD:?APP_ADMIN_PASSWORD es obligatorio}"
+      APP_SEED_DEMO:          ${APP_SEED_DEMO:-false}
+      FRONTEND_URL:           ${FRONTEND_URL:-http://localhost,https://localhost,http://localhost:80,https://localhost:443}
+    expose:
+      - "8080"
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/api/v1/server/time"]
       interval: 10s
@@ -73,8 +74,11 @@ services:
         condition: service_healthy
     ports:
       - "${FRONTEND_PORT:-80}:80"
+      - "${FRONTEND_SSL_PORT:-443}:443"
+    volumes:
+      - ./certs:/etc/nginx/certs:ro
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:80/"]
+      test: ["CMD", "wget", "-q", "--spider", "--no-check-certificate", "http://127.0.0.1:80/"]
       interval: 10s
       timeout: 5s
       retries: 5

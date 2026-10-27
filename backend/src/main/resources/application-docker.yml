@@ -4,7 +4,7 @@ spring:
   datasource:
     url:      ${DATABASE_URL:jdbc:mariadb://db:3306/hotel_bahia}
     username: ${DATABASE_USERNAME:hotel}
-    password: ${DATABASE_PASSWORD:hotel_bahia}
+    password: ${DATABASE_PASSWORD}
 
   jpa:
     hibernate:
@@ -14,8 +14,7 @@ spring:
 
 app:
   jwt:
-    # Sin default: el header de docker-compose exige JWT_SECRET en .env.
-    # Un secreto conocido permitiría forjar tokens a cualquiera con acceso al repo.
+    # Sin default: docker-compose exige JWT_SECRET en .env.
     secret:         ${JWT_SECRET}
     expiration-ms:  ${JWT_EXPIRATION_MS:86400000}
   timezone: ${APP_TIMEZONE:America/Lima}
@@ -23,3 +22,4 @@ app:
     email:    ${APP_ADMIN_EMAIL:zahidmatos@hotel.com}
     nombre:   ${APP_ADMIN_NOMBRE:Zahid Matos}
     password: ${APP_ADMIN_PASSWORD:}
+  seed-demo: ${APP_SEED_DEMO:false}

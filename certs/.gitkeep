@@ -1,0 +1,2 @@
+# Directorio de certificados SSL/TLS para Nginx (fullchain.pem y privkey.pem)
+# Los archivos de certificados reales (*.pem, *.key) están excluidos en .gitignore.

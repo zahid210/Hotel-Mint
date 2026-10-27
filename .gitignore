@@ -29,6 +29,13 @@ pgdata/
 dbdata/
 .env
 
+# === Certificados y Backups ===
+certs/*.pem
+certs/*.key
+certs/*.crt
+backups/*.sql
+backups/*.gz
+
 # === Misc ===
 *.log
 *.tmp
