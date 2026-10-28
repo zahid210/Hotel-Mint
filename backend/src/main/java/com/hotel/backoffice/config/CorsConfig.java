@@ -11,21 +11,14 @@ import java.util.List;
 @Configuration
 public class CorsConfig {
 
-    @Value("${FRONTEND_URL:http://localhost:5173}")
+    @Value("${FRONTEND_URL:}")
     private String frontendUrl;
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
-        List<String> origins = new ArrayList<>(List.of(
-                "http://localhost",
-                "http://localhost:80",
-                "http://localhost:5173",
-                "http://127.0.0.1",
-                "http://127.0.0.1:80",
-                "http://127.0.0.1:5173"
-        ));
+        List<String> origins = new ArrayList<>();
         if (frontendUrl != null && !frontendUrl.isBlank()) {
             for (String u : frontendUrl.split(",")) {
                 String trimmed = u.trim();
@@ -34,13 +27,29 @@ public class CorsConfig {
                 }
             }
         }
+
+        // Si no se especificó frontendUrl (modo local/desarrollo), habilitar localhost
+        if (origins.isEmpty()) {
+            origins.addAll(List.of(
+                    "http://localhost",
+                    "http://localhost:80",
+                    "http://localhost:5173",
+                    "https://localhost",
+                    "https://localhost:443",
+                    "http://127.0.0.1",
+                    "http://127.0.0.1:80",
+                    "http://127.0.0.1:5173"
+            ));
+        }
         config.setAllowedOrigins(origins);
 
         config.setAllowedMethods(List.of(
                 "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"
         ));
         config.setAllowedHeaders(List.of("*"));
-        config.setAllowCredentials(true);
+        // P3-04: Con autenticación JWT en cabecera Authorization (Bearer),
+        // allowCredentials debe ser false para prevenir riesgos CSRF y orígenes ambiguos.
+        config.setAllowCredentials(false);
         config.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source =

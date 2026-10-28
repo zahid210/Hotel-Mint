@@ -14,6 +14,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -32,6 +33,7 @@ public class ReservaService {
     private final UsuarioRepository    usuarioRepo;
     private final PedidoRepository     pedidoRepo;
     private final AuditoriaService     auditoriaService;
+    private final Clock                clock;
 
     @Transactional(readOnly = true)
     public List<ReservaResponseDTO> listarTodas() {
@@ -187,7 +189,7 @@ public class ReservaService {
                 ));
 
         // El check-in solo corresponde el día de llegada o después.
-        if (reserva.getFechaEntrada().isAfter(LocalDate.now())) {
+        if (reserva.getFechaEntrada().isAfter(LocalDate.now(clock))) {
             throw new IllegalArgumentException(
                     "No se puede registrar la entrada antes de la fecha de llegada del huésped."
             );
@@ -207,7 +209,7 @@ public class ReservaService {
         }
 
         // NIVEL 1: timestamp exacto del check-in
-        reserva.setCheckinReal(LocalDateTime.now());
+        reserva.setCheckinReal(LocalDateTime.now(clock));
 
         // Transición de estados
         reserva.setEstado(EstadoReserva.CHECKIN);
@@ -233,7 +235,7 @@ public class ReservaService {
             );
         }
 
-        LocalDateTime ahora = LocalDateTime.now();
+        LocalDateTime ahora = LocalDateTime.now(clock);
 
         // NIVEL 1 + NIVEL 2: timestamp real + cálculo de horas extra
         // El método interno compara ahora vs horaSalidaAcordada

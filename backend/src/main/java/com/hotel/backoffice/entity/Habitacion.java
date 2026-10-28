@@ -28,6 +28,7 @@ public class Habitacion {
     private TipoHabitacion tipo;
 
     @Column(nullable = false)
+    @Builder.Default
     private Integer capacidad = 2;
 
     @Column(name = "precio_noche", nullable = false, precision = 10, scale = 2)
@@ -35,6 +36,7 @@ public class Habitacion {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
+    @Builder.Default
     private EstadoHabitacion estado = EstadoHabitacion.LIBRE;
 
     private String descripcion;

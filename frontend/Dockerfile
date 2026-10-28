@@ -3,7 +3,7 @@
 # ════════════════════════════════════════════════════════════════
 
 # ── Etapa 1: Build (Node 22) ───────────────────────────────────
-FROM node:22-alpine AS build
+FROM node:22.14.0-alpine AS build
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -15,7 +15,7 @@ ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 
 # ── Etapa 2: Runtime Nginx ─────────────────────────────────────
-FROM nginx:alpine
+FROM nginx:1.27.4-alpine
 RUN apk add --no-cache openssl
 WORKDIR /usr/share/nginx/html
 

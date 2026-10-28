@@ -3,7 +3,7 @@
 # ════════════════════════════════════════════════════════════════
 
 # ── Etapa 1: Build backend (Spring Boot) ───────────────────────
-FROM eclipse-temurin:21-jdk-alpine AS builder
+FROM eclipse-temurin:21.0.6_7-jdk-alpine AS builder
 WORKDIR /app
 
 COPY .mvn/ .mvn/
@@ -14,7 +14,7 @@ COPY src ./src
 RUN ./mvnw package -q
 
 # ── Etapa 2: Runtime ───────────────────────────────────────────
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:21.0.6_7-jre-alpine
 WORKDIR /app
 
 RUN addgroup -S hotel && adduser -S hotel -G hotel

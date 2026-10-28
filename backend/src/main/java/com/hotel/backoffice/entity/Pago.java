@@ -28,6 +28,7 @@ public class Pago {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "estado_pago", nullable = false, length = 20)
+    @Builder.Default
     private EstadoPago estadoPago = EstadoPago.PENDIENTE;
 
     private String referencia;

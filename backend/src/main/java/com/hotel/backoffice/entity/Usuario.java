@@ -25,9 +25,11 @@ public class Usuario {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
+    @Builder.Default
     private Rol rol = Rol.RECEPCIONISTA;
 
     @Column(nullable = false)
+    @Builder.Default
     private Boolean activo = true;
 
     @Column(name = "created_at", updatable = false)

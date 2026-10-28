@@ -45,7 +45,7 @@ class HabitacionYReservaIntegridadTest {
         com.hotel.backoffice.service.AuditoriaService auditMock = Mockito.mock(com.hotel.backoffice.service.AuditoriaService.class);
 
         habitacionService = new HabitacionService(habitRepo, reservaRepo, auditMock);
-        reservaService = new ReservaService(reservaRepo, habitRepo, null, null, pedidoRepo, auditMock);
+        reservaService = new ReservaService(reservaRepo, habitRepo, null, null, pedidoRepo, auditMock, java.time.Clock.systemDefaultZone());
     }
 
     @AfterEach
