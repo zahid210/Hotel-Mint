@@ -42,9 +42,10 @@ class HabitacionYReservaIntegridadTest {
         habitRepo = Mockito.mock(HabitacionRepository.class);
         reservaRepo = Mockito.mock(ReservaRepository.class);
         pedidoRepo = Mockito.mock(PedidoRepository.class);
+        com.hotel.backoffice.service.AuditoriaService auditMock = Mockito.mock(com.hotel.backoffice.service.AuditoriaService.class);
 
-        habitacionService = new HabitacionService(habitRepo, reservaRepo);
-        reservaService = new ReservaService(reservaRepo, habitRepo, null, null, pedidoRepo);
+        habitacionService = new HabitacionService(habitRepo, reservaRepo, auditMock);
+        reservaService = new ReservaService(reservaRepo, habitRepo, null, null, pedidoRepo, auditMock);
     }
 
     @AfterEach

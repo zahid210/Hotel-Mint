@@ -10,7 +10,7 @@ public record UsuarioRequestDTO(
         String email,
 
         @NotBlank(message = "La contraseña es obligatoria")
-        @Size(min = 6, message = "La contraseña debe tener mínimo 6 caracteres")
+        @Size(min = 12, message = "La contraseña debe tener mínimo 12 caracteres")
         String password,
 
         @Pattern(regexp = "ADMIN|RECEPCIONISTA|LIMPIEZA", flags = Pattern.Flag.CASE_INSENSITIVE,

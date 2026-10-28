@@ -31,16 +31,24 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         if (StringUtils.hasText(token)) {
             String email = tokenProvider.getEmailSiValido(token);
             if (email != null) {
-                UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+                try {
+                    UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 
-                // No autenticar cuentas desactivadas: aunque el token siga válido,
-                // un usuario desactivado pierde el acceso de inmediato
-                if (userDetails.isEnabled()) {
-                    var auth = new UsernamePasswordAuthenticationToken(
-                            userDetails, null, userDetails.getAuthorities()
-                    );
-                    auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(auth);
+                    // No autenticar cuentas desactivadas: aunque el token siga válido,
+                    // un usuario desactivado pierde el acceso de inmediato
+                    if (userDetails.isEnabled()) {
+                        var auth = new UsernamePasswordAuthenticationToken(
+                                userDetails, null, userDetails.getAuthorities()
+                        );
+                        auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                        SecurityContextHolder.getContext().setAuthentication(auth);
+                    }
+                } catch (org.springframework.security.core.AuthenticationException ex) {
+                    SecurityContextHolder.clearContext();
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType("application/json;charset=UTF-8");
+                    response.getWriter().write("{\"codigo\":\"NO_AUTORIZADO\",\"mensaje\":\"Usuario no encontrado o sesión inválida.\"}");
+                    return;
                 }
             }
         }

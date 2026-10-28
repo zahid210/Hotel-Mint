@@ -32,7 +32,7 @@ class AuthSecurityTest {
 
     private String cuerpo(String email) {
         return "{\"nombre\":\"Prueba\",\"email\":\"" + email
-                + "\",\"password\":\"123456\"}";
+                + "\",\"password\":\"PasswordSegura123!\"}";
     }
 
     @Test

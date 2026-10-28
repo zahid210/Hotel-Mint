@@ -21,6 +21,9 @@ public interface ReservaRepository extends JpaRepository<Reserva, UUID> {
     List<Reserva> findAllByOrderByFechaEntradaDesc();
 
     @EntityGraph(attributePaths = {"habitacion", "huesped"})
+    org.springframework.data.domain.Page<Reserva> findAll(org.springframework.data.domain.Pageable pageable);
+
+    @EntityGraph(attributePaths = {"habitacion", "huesped"})
     Optional<Reserva> findByIdAndEstado(UUID id, EstadoReserva estado);
 
     boolean existsByHabitacionIdAndEstado(Integer habitacionId, EstadoReserva estado);
@@ -48,6 +51,9 @@ public interface ReservaRepository extends JpaRepository<Reserva, UUID> {
     // --- Filtrar por estado (Ej: ver solo las 'CONFIRMADA') ---
     @EntityGraph(attributePaths = {"habitacion", "huesped"})
     List<Reserva> findByEstadoOrderByFechaEntradaDesc(EstadoReserva estado);
+
+    @EntityGraph(attributePaths = {"habitacion", "huesped"})
+    org.springframework.data.domain.Page<Reserva> findByEstado(EstadoReserva estado, org.springframework.data.domain.Pageable pageable);
 
     // --- Reportes: filtrar en BD en vez de cargar todo ---
 

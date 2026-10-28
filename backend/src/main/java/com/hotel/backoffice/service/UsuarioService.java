@@ -22,6 +22,7 @@ public class UsuarioService {
 
     private final UsuarioRepository   repo;
     private final PasswordEncoder     encoder;
+    private final AuditoriaService    auditoriaService;
 
     // ── Listar (sin contraseñas) ─────────────────────────────
     @Transactional(readOnly = true)
@@ -36,8 +37,8 @@ public class UsuarioService {
         if (repo.findByEmail(dto.email()).isPresent()) {
             throw new IllegalArgumentException("El email ya está registrado.");
         }
-        if (dto.password() == null || dto.password().isBlank()) {
-            throw new IllegalArgumentException("La contraseña es obligatoria.");
+        if (dto.password() == null || dto.password().length() < 12) {
+            throw new IllegalArgumentException("La contraseña debe tener al menos 12 caracteres.");
         }
 
         Rol rol = parseRol(dto.rol());
@@ -58,6 +59,18 @@ public class UsuarioService {
         Usuario u = repo.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
 
+        // Proteger al último administrador activo de quedar desactivado o degradado
+        if (u.getRol() == Rol.ADMIN && Boolean.TRUE.equals(u.getActivo())) {
+            boolean desactivando = dto.activo() != null && !dto.activo();
+            boolean degradandoRol = dto.rol() != null && parseRol(dto.rol()) != Rol.ADMIN;
+            if (desactivando || degradandoRol) {
+                long adminsActivos = repo.countByRolAndActivoTrue(Rol.ADMIN);
+                if (adminsActivos <= 1) {
+                    throw new IllegalStateException("No se puede desactivar o degradar al último administrador activo.");
+                }
+            }
+        }
+
         // Email único (excepto si no cambia)
         if (dto.email() != null && !dto.email().equals(u.getEmail())) {
             if (repo.findByEmail(dto.email()).isPresent()) {
@@ -70,18 +83,24 @@ public class UsuarioService {
         if (dto.activo() != null)  u.setActivo(dto.activo());
         if (dto.rol() != null)     u.setRol(parseRol(dto.rol()));
 
-        return UsuarioResponseDTO.from(repo.save(u));
+        Usuario guardado = repo.save(u);
+        auditoriaService.registrar("ACTUALIZAR_USUARIO", "Usuario", guardado.getId(),
+                "Usuario " + guardado.getEmail() + " actualizado: rol=" + guardado.getRol() + ", activo=" + guardado.getActivo());
+        return UsuarioResponseDTO.from(guardado);
     }
 
     // ── Reset contraseña ─────────────────────────────────────
     public UsuarioResponseDTO resetPassword(UUID id, PasswordDTO dto) {
         Usuario u = repo.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
-        if (dto.password() == null || dto.password().isBlank()) {
-            throw new IllegalArgumentException("La contraseña es obligatoria.");
+        if (dto.password() == null || dto.password().length() < 12) {
+            throw new IllegalArgumentException("La contraseña debe tener al menos 12 caracteres.");
         }
         u.setPassword(encoder.encode(dto.password()));
-        return UsuarioResponseDTO.from(repo.save(u));
+        Usuario guardado = repo.save(u);
+        auditoriaService.registrar("RESET_PASSWORD", "Usuario", guardado.getId(),
+                "Contraseña restablecida para usuario " + guardado.getEmail());
+        return UsuarioResponseDTO.from(guardado);
     }
 
     private Rol parseRol(String valor) {

@@ -31,11 +31,26 @@ public class ReservaService {
     private final HuespedRepository    huespedRepo;
     private final UsuarioRepository    usuarioRepo;
     private final PedidoRepository     pedidoRepo;
+    private final AuditoriaService     auditoriaService;
 
     @Transactional(readOnly = true)
     public List<ReservaResponseDTO> listarTodas() {
         return reservaRepo.findAllByOrderByFechaEntradaDesc()
                 .stream().map(ReservaResponseDTO::from).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<ReservaResponseDTO> listarPaginado(String estado, int page, int size) {
+        int boundedSize = Math.min(Math.max(size, 1), 100);
+        org.springframework.data.domain.Pageable pageable =
+                org.springframework.data.domain.PageRequest.of(Math.max(page, 0), boundedSize,
+                        org.springframework.data.domain.Sort.by("fechaEntrada").descending());
+
+        if (estado != null && !estado.isBlank()) {
+            EstadoReserva estadoEnum = EstadoReserva.valueOf(estado.toUpperCase(Locale.ROOT));
+            return reservaRepo.findByEstado(estadoEnum, pageable).map(ReservaResponseDTO::from);
+        }
+        return reservaRepo.findAll(pageable).map(ReservaResponseDTO::from);
     }
 
     // Filtrar por estado desde el controller
@@ -157,7 +172,11 @@ public class ReservaService {
                 .notas(dto.notas())
                 .build();
 
-        return ReservaResponseDTO.from(reservaRepo.save(reserva));
+        Reserva guardada = reservaRepo.save(reserva);
+        auditoriaService.registrar("CREAR_RESERVA", "Reserva", guardada.getId(),
+                "Reserva creada para huésped " + huesped.getNombre() + " " + huesped.getApellido()
+                        + " en habitación " + hab.getNumero());
+        return ReservaResponseDTO.from(guardada);
     }
 
     // ── CHECK-IN: registra el timestamp real ─────────────────────
@@ -194,6 +213,9 @@ public class ReservaService {
         reserva.setEstado(EstadoReserva.CHECKIN);
         reserva.getHabitacion().setEstado(EstadoHabitacion.OCUPADA);
 
+        auditoriaService.registrar("CHECKIN", "Reserva", id,
+                "Check-in realizado en habitación " + reserva.getHabitacion().getNumero());
+
         return ReservaResponseDTO.from(reserva);
     }
 
@@ -221,6 +243,10 @@ public class ReservaService {
         reserva.setEstado(EstadoReserva.CHECKOUT);
         reserva.getHabitacion().setEstado(EstadoHabitacion.LIMPIEZA);
 
+        auditoriaService.registrar("CHECKOUT", "Reserva", id,
+                "Check-out realizado en habitación " + reserva.getHabitacion().getNumero()
+                        + ". Total estancia: " + reserva.calcularTotalEstancia());
+
         return ReservaResponseDTO.from(reserva);
     }
 
@@ -237,6 +263,10 @@ public class ReservaService {
             reserva.getHabitacion().setEstado(EstadoHabitacion.LIMPIEZA);
         }
         reserva.setEstado(EstadoReserva.CANCELADA);
+
+        auditoriaService.registrar("CANCELAR", "Reserva", id,
+                "Cancelación de reserva en habitación " + reserva.getHabitacion().getNumero());
+
         return ReservaResponseDTO.from(reserva);
     }
 }

@@ -18,11 +18,16 @@ import java.util.UUID;
 public class ReservaController {
 
     private final ReservaService service;
+    private final com.hotel.backoffice.service.IdempotenciaService idempotenciaService;
 
-    // AHORA acepta ?estado=CONFIRMADA, etc.
     @GetMapping
-    public ResponseEntity<List<ReservaResponseDTO>> listar(
-            @RequestParam(required = false) String estado) {
+    public ResponseEntity<?> listar(
+            @RequestParam(required = false) String estado,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        if (page != null) {
+            return ResponseEntity.ok(service.listarPaginado(estado, page, size != null ? size : 20));
+        }
         if (estado != null && !estado.isBlank()) {
             return ResponseEntity.ok(service.listarPorEstado(estado));
         }
@@ -36,8 +41,23 @@ public class ReservaController {
 
     @PostMapping
     public ResponseEntity<ReservaResponseDTO> crear(
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @Valid @RequestBody ReservaRequestDTO dto) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.crearReserva(dto));
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            var existente = idempotenciaService.buscar(idempotencyKey);
+            if (existente.isPresent()) {
+                ReservaResponseDTO cached = idempotenciaService.deserializar(
+                        existente.get().getRespuestaJson(), ReservaResponseDTO.class);
+                return ResponseEntity.status(existente.get().getStatusCode()).body(cached);
+            }
+        }
+
+        ReservaResponseDTO creada = service.crearReserva(dto);
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            idempotenciaService.registrar(idempotencyKey, "Reserva", creada.id().toString(),
+                    HttpStatus.CREATED.value(), creada);
+        }
+        return ResponseEntity.status(HttpStatus.CREATED).body(creada);
     }
 
     @PatchMapping("/{id}/checkin")

@@ -21,6 +21,7 @@ public class HabitacionService {
 
     private final HabitacionRepository repo;
     private final ReservaRepository reservaRepo;
+    private final AuditoriaService auditoriaService;
 
     public List<HabitacionResponseDTO> listarTodas() {
         return repo.findAllByOrderByNumeroAsc()
@@ -102,6 +103,9 @@ public class HabitacionService {
         }
 
         h.setEstado(destino);
+        repo.save(h);
+        auditoriaService.registrar("CAMBIO_ESTADO", "Habitacion", h.getId(),
+                "Habitación " + h.getNumero() + " cambió de estado " + actual + " a " + destino);
         return HabitacionResponseDTO.from(h);
     }
 }

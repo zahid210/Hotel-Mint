@@ -11,7 +11,7 @@ COPY mvnw pom.xml ./
 RUN ./mvnw dependency:go-offline -q
 
 COPY src ./src
-RUN ./mvnw package -DskipTests -q
+RUN ./mvnw package -q
 
 # ── Etapa 2: Runtime ───────────────────────────────────────────
 FROM eclipse-temurin:21-jre-alpine

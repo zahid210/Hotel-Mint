@@ -15,19 +15,27 @@ public interface PedidoRepository extends JpaRepository<Pedido, UUID> {
 
     @Override
     @org.springframework.data.jpa.repository.EntityGraph(
-            attributePaths = {"reserva", "habitacion", "usuario", "items", "items.menuItem"})
+            attributePaths = {"reserva", "reserva.huesped", "habitacion", "usuario", "items", "items.menuItem"})
     Optional<Pedido> findById(UUID id);
 
     @org.springframework.data.jpa.repository.EntityGraph(
-            attributePaths = {"reserva", "habitacion", "usuario", "items", "items.menuItem"})
+            attributePaths = {"reserva", "reserva.huesped", "habitacion", "usuario", "items", "items.menuItem"})
     List<Pedido> findAllByOrderByCreatedAtDesc();
 
     @org.springframework.data.jpa.repository.EntityGraph(
-            attributePaths = {"reserva", "habitacion", "usuario", "items", "items.menuItem"})
+            attributePaths = {"reserva", "reserva.huesped", "habitacion", "usuario", "items", "items.menuItem"})
+    org.springframework.data.domain.Page<Pedido> findAll(org.springframework.data.domain.Pageable pageable);
+
+    @org.springframework.data.jpa.repository.EntityGraph(
+            attributePaths = {"reserva", "reserva.huesped", "habitacion", "usuario", "items", "items.menuItem"})
     List<Pedido> findByEstadoOrderByCreatedAtDesc(EstadoPedido estado);
 
     @org.springframework.data.jpa.repository.EntityGraph(
-            attributePaths = {"reserva", "habitacion", "usuario", "items", "items.menuItem"})
+            attributePaths = {"reserva", "reserva.huesped", "habitacion", "usuario", "items", "items.menuItem"})
+    org.springframework.data.domain.Page<Pedido> findByEstado(EstadoPedido estado, org.springframework.data.domain.Pageable pageable);
+
+    @org.springframework.data.jpa.repository.EntityGraph(
+            attributePaths = {"reserva", "reserva.huesped", "habitacion", "usuario", "items", "items.menuItem"})
     List<Pedido> findByReservaIdOrderByCreatedAtDesc(UUID reservaId);
 
     boolean existsByReservaIdAndEstado(UUID reservaId, EstadoPedido estado);

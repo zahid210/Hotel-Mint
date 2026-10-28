@@ -46,6 +46,19 @@ public class PedidoService {
     }
 
     @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<PedidoResponseDTO> listarPaginado(String estado, int page, int size) {
+        int boundedSize = Math.min(Math.max(size, 1), 100);
+        org.springframework.data.domain.Pageable pageable =
+                org.springframework.data.domain.PageRequest.of(Math.max(page, 0), boundedSize,
+                        org.springframework.data.domain.Sort.by("createdAt").descending());
+
+        if (estado != null && !estado.isBlank()) {
+            return pedidoRepo.findByEstado(parseEstado(estado), pageable).map(PedidoResponseDTO::from);
+        }
+        return pedidoRepo.findAll(pageable).map(PedidoResponseDTO::from);
+    }
+
+    @Transactional(readOnly = true)
     public PedidoResponseDTO obtener(UUID id) {
         return pedidoRepo.findById(id)
                 .map(PedidoResponseDTO::from)

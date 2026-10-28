@@ -63,6 +63,29 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse("SOLICITUD_INVALIDA", ex.getMessage()));
     }
 
+    @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex) {
+        String detalle = String.format("El parámetro '%s' con valor '%s' no tiene el formato esperado.", ex.getName(), ex.getValue());
+        return ResponseEntity.badRequest()
+                .body(new ErrorResponse("PARAMETRO_INVALIDO", detalle));
+    }
+
+    @ExceptionHandler(org.springframework.web.bind.MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingParam(org.springframework.web.bind.MissingServletRequestParameterException ex) {
+        String detalle = String.format("El parámetro requerido '%s' no fue proporcionado.", ex.getParameterName());
+        return ResponseEntity.badRequest()
+                .body(new ErrorResponse("PARAMETRO_FALTANTE", detalle));
+    }
+
+    @ExceptionHandler(jakarta.validation.ConstraintViolationException.class)
+    public ResponseEntity<ErrorResponse> handleConstraintViolation(jakarta.validation.ConstraintViolationException ex) {
+        String detalle = ex.getConstraintViolations().stream()
+                .map(v -> v.getPropertyPath() + ": " + v.getMessage())
+                .collect(Collectors.joining("; "));
+        return ResponseEntity.badRequest()
+                .body(new ErrorResponse("RESTRICCION_VIOLADA", detalle));
+    }
+
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<ErrorResponse> handleIllegalState(IllegalStateException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)

@@ -20,11 +20,17 @@ import java.util.UUID;
 public class PedidoController {
 
     private final PedidoService service;
+    private final com.hotel.backoffice.service.IdempotenciaService idempotenciaService;
 
     @GetMapping
-    public ResponseEntity<List<PedidoResponseDTO>> listar(
+    public ResponseEntity<?> listar(
             @RequestParam(required = false) String estado,
-            @RequestParam(required = false) UUID   reservaId) {
+            @RequestParam(required = false) UUID   reservaId,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        if (page != null) {
+            return ResponseEntity.ok(service.listarPaginado(estado, page, size != null ? size : 20));
+        }
         return ResponseEntity.ok(service.listar(estado, reservaId));
     }
 
@@ -34,9 +40,24 @@ public class PedidoController {
     }
 
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public PedidoResponseDTO crear(@Valid @RequestBody PedidoRequestDTO dto) {
-        return service.crear(dto);
+    public ResponseEntity<PedidoResponseDTO> crear(
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            @Valid @RequestBody PedidoRequestDTO dto) {
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            var existente = idempotenciaService.buscar(idempotencyKey);
+            if (existente.isPresent()) {
+                PedidoResponseDTO cached = idempotenciaService.deserializar(
+                        existente.get().getRespuestaJson(), PedidoResponseDTO.class);
+                return ResponseEntity.status(existente.get().getStatusCode()).body(cached);
+            }
+        }
+
+        PedidoResponseDTO creado = service.crear(dto);
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            idempotenciaService.registrar(idempotencyKey, "Pedido", creado.id().toString(),
+                    HttpStatus.CREATED.value(), creado);
+        }
+        return ResponseEntity.status(HttpStatus.CREATED).body(creado);
     }
 
     @PatchMapping("/{id}/estado")

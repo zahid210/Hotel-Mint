@@ -8,9 +8,14 @@ spring:
 
   jpa:
     hibernate:
-      # update: crea/actualiza el esquema si falta, sin borrar datos
-      ddl-auto: update
+      # validate: valida que el esquema coincida exactamente con las migraciones Flyway
+      ddl-auto: validate
     show-sql: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
 
 app:
   jwt:

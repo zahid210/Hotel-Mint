@@ -28,7 +28,11 @@ public class AuthService {
 
     // ── LOGIN ────────────────────────────────────────────────
     public AuthResponseDTO login(LoginRequestDTO dto) {
-        if (rateLimiter.bloqueado(dto.email())) {
+        return login(dto, null);
+    }
+
+    public AuthResponseDTO login(LoginRequestDTO dto, String ip) {
+        if (rateLimiter.bloqueado(dto.email(), ip)) {
             throw new ThrottledException(
                     "Demasiados intentos fallidos. Intente nuevamente en 15 minutos."
             );
@@ -40,11 +44,11 @@ public class AuthService {
                     new UsernamePasswordAuthenticationToken(dto.email(), dto.password())
             );
         } catch (AuthenticationException e) {
-            rateLimiter.registrarFallo(dto.email());
+            rateLimiter.registrarFallo(dto.email(), ip);
             throw new BadCredentialsException("Email o contraseña incorrectos.");
         }
 
-        rateLimiter.limpiar(dto.email());
+        rateLimiter.limpiar(dto.email(), ip);
 
         // 2. Cargar usuario para armar la respuesta
         Usuario usuario = repo.findByEmail(dto.email())

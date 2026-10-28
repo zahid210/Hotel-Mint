@@ -4,8 +4,15 @@ app:
     expiration-ms: 86400000
 
 spring:
+  datasource:
+    url: jdbc:h2:mem:hotel_test;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
   jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
-      # Base usa "validate": aquí creamos solo las tablas/columnas
-      # que faltan (menú, pedidos, consumo) sin tocar los datos.
-      ddl-auto: update
+      ddl-auto: create-drop
+    show-sql: false
+  flyway:
+    enabled: false

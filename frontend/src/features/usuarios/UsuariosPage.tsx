@@ -99,7 +99,7 @@ export function UsuariosPage({ onMensaje }: Props) {
     const crear = async () => {
         const err = validarBase()
         if (err) return setErrorForm(err)
-        if (form.password.length < 6) return setErrorForm('La contraseña debe tener mínimo 6 caracteres')
+        if (form.password.length < 12) return setErrorForm('La contraseña debe tener mínimo 12 caracteres')
 
         setGuardando(true)
         setErrorForm(null)
@@ -147,7 +147,7 @@ export function UsuariosPage({ onMensaje }: Props) {
 
     const resetPassword = async () => {
         if (!seleccion) return
-        if (form.password.length < 6) return setErrorForm('La contraseña debe tener mínimo 6 caracteres')
+        if (form.password.length < 12) return setErrorForm('La contraseña debe tener mínimo 12 caracteres')
 
         setGuardando(true)
         setErrorForm(null)

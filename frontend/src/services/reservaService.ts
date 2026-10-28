@@ -55,8 +55,12 @@ export const reservaService = {
     listarTodas: () =>
         api.get<Reserva[]>('/reservas').then(r => r.data),
 
-    crear: (data: NuevaReservaForm) =>
-        api.post<Reserva>('/reservas', data).then(r => r.data),
+    crear: (data: NuevaReservaForm, idempotencyKey?: string) => {
+        const key = idempotencyKey ?? (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : undefined)
+        return api.post<Reserva>('/reservas', data, {
+            headers: key ? { 'Idempotency-Key': key } : undefined,
+        }).then(r => r.data)
+    },
 
     checkIn: (id: string) =>
         api.patch<Reserva>(`/reservas/${id}/checkin`).then(r => r.data),

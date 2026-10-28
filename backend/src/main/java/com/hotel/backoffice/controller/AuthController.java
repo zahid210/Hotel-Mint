@@ -25,8 +25,9 @@ public class AuthController {
     public record MeResponse(String email, String nombre, String rol) {}
 
     @PostMapping("/login")
-    public AuthResponseDTO login(@Valid @RequestBody LoginRequestDTO dto) {
-        return authService.login(dto);
+    public AuthResponseDTO login(@Valid @RequestBody LoginRequestDTO dto, jakarta.servlet.http.HttpServletRequest request) {
+        String ip = com.hotel.backoffice.util.ClientIpResolver.getClientIp(request);
+        return authService.login(dto, ip);
     }
 
     @PostMapping("/register")

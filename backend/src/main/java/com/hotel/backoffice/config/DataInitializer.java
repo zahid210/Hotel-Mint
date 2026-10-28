@@ -122,29 +122,7 @@ public class DataInitializer implements CommandLineRunner {
 
     // ── Menú de bocaditos ──────────────────────────────────────
     private void seedMenu() {
-        List<String> categoriasBocadito = List.of("SNACKS", "GALLETAS",
-                "DULCES", "GASEOSAS", "BEBIDAS");
-        boolean yaMigrado = menuRepo.count() > 0 && menuRepo.findAll().stream()
-                .anyMatch(m -> categoriasBocadito.contains(m.getCategoria()));
-
-        if (yaMigrado) return;
-
-        int eliminados = 0, deshabilitados = 0;
-        for (MenuItem m : menuRepo.findAll()) {
-            if (pedidoItemRepo.existsByMenuItemId(m.getId())) {
-                m.setDisponible(false);
-                menuRepo.save(m);
-                deshabilitados++;
-            } else {
-                menuRepo.delete(m);
-                eliminados++;
-            }
-        }
-        if (eliminados + deshabilitados > 0) {
-            log.info("Menú migrado comidas → bocaditos: "
-                    + "{} retirados, {} deshabilitados por historial.",
-                    eliminados, deshabilitados);
-        }
+        if (menuRepo.count() > 0) return;
         menuRepo.saveAll(menuBocaditos());
     }
 
